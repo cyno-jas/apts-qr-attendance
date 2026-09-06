@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>APTS QR Attendance</title>
+
+  <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 20px;
+      background: #f4f6f8;
+      color: #182230;
+    }
+
+    .container {
+      max-width: 700px;
+      margin: auto;
+    }
+
+    .card {
+      background: white;
+      padding: 20px;
+      border-radius: 16px;
+      margin-bottom: 18px;
+      box-shadow: 0 3px 14px #0001;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    #reader {
+      width: 100%;
+    }
+
+    #result {
+      text-align: center;
+      padding: 20px;
+      min-height: 100px;
+    }
+
+    .success {
+      color: #16833b;
+    }
+
+    .error {
+      color: #b42318;
+    }
+
+    .name {
+      font-size: 26px;
+      font-weight: bold;
+      margin: 10px 0;
+    }
+
+    .count {
+      text-align: center;
+      font-size: 36px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+
+<div class="container">
+
+  <div class="card">
+    <h1>APTS QR Attendance</h1>
+    <p style="text-align:center;">
+      Scan the QR code on the student's ID.
+    </p>
+  </div>
+
+  <div class="card">
+    <div id="reader"></div>
+  </div>
+
+  <div class="card">
+    <div id="result">
+      Waiting for scan...
+    </div>
+  </div>
+
+  <div class="card">
+    <div style="text-align:center;">
+      Attendance
+    </div>
+
+    <div class="count" id="count">
+      —
+    </div>
+
+  </div>
+
+</div>
+
+
+<script>
+
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzHUhqloys83aqNYf9g2TKUT8-5C9y-XH5n04lMVHLyUt783qJimc4KGcw6T2Qw53XP/exec";
+
+let busy = false;
+
+
+function showResult(message, className = "") {
+  document.getElementById("result").innerHTML =
+    `<div class="${className}">${message}</div>`;
+}
+
+
+function scanQRCode(decodedText) {
+
+  if (busy) return;
+
+  busy = true;
+
+  showResult("Checking student...");
+
+  const callbackName =
+    "callback_" + Date.now();
+
+  window[callbackName] = function(response) {
+
+    if (response.ok) {
+
+      showResult(`
+        <div class="success">✓ ATTENDANCE RECORDED</div>
+
+        <div class="name">
+          ${escapeHtml(response.name)}
+        </div>
+
+        <div>
+          ${escapeHtml(response.studentId)}
+        </div>
+
+        <div>
+          ${escapeHtml(response.year)}
+          ·
+          ${escapeHtml(response.section)}
+        </div>
+
+        <div>
+          ${escapeHtml(response.timestamp)}
+        </div>
+      `);
+
+    }
+
+    else if (response.duplicate) {
+
+      showResult(`
+        <div class="error">⚠ ALREADY RECORDED</div>
+
+        <div class="name">
+          ${escapeHtml(response.name)}
+        </div>
+
+        <div>
+          ${escapeHtml(response.studentId)}
+        </div>
+      `);
+
+    }
+
+    else {
+
+      showResult(
+        "✕ " + escapeHtml(response.message),
+        "error"
+      );
+
+    }
+
+    delete window[callbackName];
+
+    setTimeout(() => {
+      busy = false;
+    }, 1500);
+  };
+
+
+  const script = document.createElement("script");
+
+  script.src =
+    APPS_SCRIPT_URL +
+    "?action=record" +
+    "&id=" +
+    encodeURIComponent(decodedText) +
+    "&callback=" +
+    callbackName;
+
+  script.onerror = function() {
+
+    showResult(
+      "System connection error.",
+      "error"
+    );
+
+    delete window[callbackName];
+
+    setTimeout(() => {
+      busy = false;
+    }, 1500);
+  };
+
+  document.body.appendChild(script);
+}
+
+
+function escapeHtml(text) {
+
+  return String(text || "").replace(
+    /[&<>"']/g,
+
+    function(match) {
+
+      return {
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      }[match];
+
+    }
+  );
+}
+
+
+new Html5QrcodeScanner(
+  "reader",
+  {
+    fps: 10,
+    qrbox: {
+      width: 250,
+      height: 250
+    }
+  },
+  false
+).render(scanQRCode);
+
+</script>
+
+</body>
+</html>
